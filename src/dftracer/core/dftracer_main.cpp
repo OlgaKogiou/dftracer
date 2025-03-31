@@ -112,13 +112,14 @@ bool dftracer::DFTracerCore::finalize() {
     }
     if (bind && conf->io) {
       DFTRACER_LOG_INFO("Release I/O bindings", "");
-      brahma_free_bindings();
       auto posix_instance = brahma::POSIXDFTracer::get_instance();
       if (posix_instance != nullptr) {
+        posix_instance->unbind();
         posix_instance->finalize();
       }
       auto stdio_instance = brahma::STDIODFTracer::get_instance();
       if (stdio_instance != nullptr) {
+        stdio_instance->unbind();
         stdio_instance->finalize();
       }
 #ifdef DFTRACER_FTRACING_ENABLE
@@ -134,6 +135,8 @@ bool dftracer::DFTracerCore::finalize() {
     }
     this->is_initialized = false;
     return true;
+  } else {
+    DFTRACER_LOG_INFO("Already finalized on pid %d", this->process_id);
   }
   return false;
 }
@@ -164,7 +167,6 @@ void dftracer::DFTracerCore::initialize(bool _bind, const char *_log_file,
         ssize_t read_bytes = df_read(fd, exec_cmd, DFT_PATH_MAX);
         df_close(fd);
         ssize_t index = 0;
-        size_t parts = 0;
         size_t last_index = 0;
         bool has_extracted = false;
         while (index < read_bytes - 1 && index < DFT_PATH_MAX - 2) {
@@ -172,22 +174,29 @@ void dftracer::DFTracerCore::initialize(bool _bind, const char *_log_file,
             if (!has_extracted) {
               strcpy(exec_name, basename(exec_cmd + last_index));
               if (exec_name[0] != '-' && strstr(exec_name, "python") == NULL &&
-                  strstr(exec_name, "env") == NULL) {
+                  strstr(exec_name, "env") == NULL &&
+                  strstr(exec_name, "multiprocessing") == NULL) {
                 has_extracted = true;
                 DFTRACER_LOG_INFO("Extracted process_name %s", exec_name);
               }
             }
             exec_cmd[index] = SEPARATOR;
             last_index = index + 1;
-            parts++;
           }
-          /*if (parts > 1) {
-            exec_cmd[index] = '\0';
-          }*/
           index++;
+        }
+        if (!has_extracted) {
+          if (strstr(exec_name, "multiprocessing") != NULL) {
+            sprintf(exec_name, "DEFAULT-spawn");
+          } else {
+            sprintf(exec_name, "DEFAULT");
+          }
         }
         exec_cmd[DFT_PATH_MAX - 1] = '\0';
         DFTRACER_LOG_DEBUG("Exec command line %s", exec_cmd);
+      }
+      if (_process_id != nullptr && *_process_id != -1) {
+        sprintf(exec_name, "%s-%lu", exec_name, df_getpid());
       }
       if (_log_file == nullptr) {
         DFTRACER_LOG_INFO("Extracted process_name %s", exec_name);
@@ -224,7 +233,7 @@ void dftracer::DFTracerCore::initialize(bool _bind, const char *_log_file,
               if (!conf->data_dirs.empty()) {
                 this->data_dirs = conf->data_dirs;
               } else {  // GCOV_EXCL_START
-                DFTRACER_LOG_ERROR(DFTRACER_UNDEFINED_DATA_DIR_MSG, "");
+                DFTRACER_LOG_ERROR("%s", DFTRACER_UNDEFINED_DATA_DIR_MSG);
                 throw std::runtime_error(DFTRACER_UNDEFINED_DATA_DIR_CODE);
               }  // GCOV_EXCL_STOP
             } else {
@@ -238,7 +247,7 @@ void dftracer::DFTracerCore::initialize(bool _bind, const char *_log_file,
           } else {
             DFTRACER_LOG_DEBUG("Ignoring data_dirs as tracing all files", "");
           }
-          brahma_gotcha_wrap("dftracer", conf->gotcha_priority);
+
           if (!conf->trace_all_files) {
             auto paths = split(this->data_dirs, DFTRACER_DATA_DIR_DELIMITER);
             for (const auto &path : paths) {
@@ -247,10 +256,16 @@ void dftracer::DFTracerCore::initialize(bool _bind, const char *_log_file,
             }
           }
           if (conf->posix) {
-            brahma::POSIXDFTracer::get_instance(conf->trace_all_files);
+            auto posix =
+                brahma::POSIXDFTracer::get_instance(conf->trace_all_files);
+            posix->bind<brahma::POSIXDFTracer>("dftracer",
+                                               conf->gotcha_priority);
           }
           if (conf->stdio) {
-            brahma::STDIODFTracer::get_instance(conf->trace_all_files);
+            auto stdio =
+                brahma::STDIODFTracer::get_instance(conf->trace_all_files);
+            stdio->bind<brahma::STDIODFTracer>("dftracer",
+                                               conf->gotcha_priority);
           }
         }
 #ifdef DFTRACER_FTRACING_ENABLE

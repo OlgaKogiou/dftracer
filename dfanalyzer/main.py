@@ -175,35 +175,23 @@ def load_objects(line, fn, time_granularity, time_approximate, condition_fn, loa
             if "tid" in val:
                 d["tid"] = val["tid"]
             if "args" in val and "hhash" in val["args"]:
-                if type(val["args"]["hhash"]) is str:
-                    d["hhash"] = int(val["args"]["hhash"],16)
-                else: 
-                    d["hhash"] = val["args"]["hhash"]
+                d["hhash"] = str(val["args"]["hhash"])
             if "M" == val["ph"]:
                 if d["name"] == "FH":
                     d["type"] = 1 # 1-> file hash
                     if "args" in val and "name" in val["args"] and "value" in val["args"]:
                         d["name"] = val["args"]["name"]
-                        if type(val["args"]["value"]) is str:
-                            d["hash"] = int(val["args"]["value"],16)
-                        else: 
-                            d["hash"] = val["args"]["value"]
+                        d["hash"] = str(val["args"]["value"])
                 elif d["name"] == "HH":
                     d["type"] = 2 # 2-> hostname hash
                     if "args" in val and "name" in val["args"] and "value" in val["args"]:
                         d["name"] = val["args"]["name"]
-                        if type(val["args"]["value"]) is str:
-                            d["hash"] = int(val["args"]["value"],16)
-                        else: 
-                            d["hash"] = val["args"]["value"]
+                        d["hash"] = str(val["args"]["value"])
                 elif d["name"] == "SH":
                     d["type"] = 3 # 3-> string hash
                     if "args" in val and "name" in val["args"] and "value" in val["args"]:
                         d["name"] = val["args"]["name"]
-                        if type(val["args"]["value"]) is str:
-                            d["hash"] = int(val["args"]["value"],16)
-                        else: 
-                            d["hash"] = val["args"]["value"]
+                        d["hash"] = str(val["args"]["value"])
                 elif d["name"] == "PR":
                     d["type"] = 5 # 5-> process metadata
                     if "args" in val and "name" in val["args"] and "value" in val["args"]:
@@ -304,7 +292,7 @@ def io_columns():
         'io_time': "string[pyarrow]" if not conf.time_approximate else "uint64[pyarrow]",
         'app_io_time': "string[pyarrow]" if not conf.time_approximate else "uint64[pyarrow]",
         'total_time': "string[pyarrow]" if not conf.time_approximate else "uint64[pyarrow]",
-        'fhash': "uint64[pyarrow]",
+        'fhash': "string[pyarrow]",
         'phase': "uint16[pyarrow]",
         'size': "uint64[pyarrow]"
     }
@@ -466,15 +454,15 @@ class DFAnalyzer:
             main_bag = pfw_bag
         if main_bag:
             columns = {'name': "string[pyarrow]", 'cat': "string[pyarrow]",'type': "uint8[pyarrow]", 
-                       'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]",
+                       'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "string[pyarrow]",
                        'ts': "uint64[pyarrow]", 'te': "uint64[pyarrow]", 'dur': "uint64[pyarrow]",
                        'tinterval': "string[pyarrow]" if not self.conf.time_approximate else "uint64[pyarrow]", 'trange': "uint64[pyarrow]"}
             columns.update(io_columns())
             columns.update(load_cols)
-            file_hash_columns = {'name': "string[pyarrow]", 'hash':"uint64[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "uint64[pyarrow]"}
-            hostname_hash_columns = {'name': "string[pyarrow]", 'hash':"uint64[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "uint64[pyarrow]"}
-            string_hash_columns = {'name': "string[pyarrow]", 'hash':"uint64[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "uint64[pyarrow]"}
-            other_metadata_columns = { 'name':"string[pyarrow]" ,'value':"string[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "uint64[pyarrow]"}
+            file_hash_columns = {'name': "string[pyarrow]", 'hash':"string[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "string[pyarrow]"}
+            hostname_hash_columns = {'name': "string[pyarrow]", 'hash':"string[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "string[pyarrow]"}
+            string_hash_columns = {'name': "string[pyarrow]", 'hash':"string[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "string[pyarrow]"}
+            other_metadata_columns = { 'name':"string[pyarrow]" ,'value':"string[pyarrow]",'pid': "uint64[pyarrow]", 'tid': "uint64[pyarrow]", 'hhash': "string[pyarrow]"}
             if "FH" in metadata_cols:
                 file_hash_columns.update(metadata_cols["FH"])
             if "HH" in metadata_cols:
